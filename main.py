@@ -13,20 +13,18 @@ class NeuralNetwork:
 
     def __init__(self, number_of_digits=1, resolution=(0, 0)):
         self.resolution = resolution
-        for i in range(3,7):
+        for i in range(0, 4):
             digit_list = []
             for j in range(number_of_digits):
                 digit_list.append(Image.open('digits/' + str(i) + '/' + str(j) + '.png').convert('L'))
             self.__digits[i] = digit_list
 
     def train(self):
+        self.__weights = np.zeros((self.resolution[0] * self.resolution[1], self.resolution[0] * self.resolution[1]))
         for digit in self.__digits:
             for img in self.__digits[digit]:
                 np_img = self.__convert(img)
-                if digit == 3:
-                    self.__weights = np_img.T.dot(np_img)
-                else:
-                    self.__weights += np_img.T.dot(np_img)
+                self.__weights += np_img.T.dot(np_img)
         np.fill_diagonal(self.__weights, 0)
 
     def show_weights(self):
@@ -38,13 +36,12 @@ class NeuralNetwork:
         img = Image.open(path).convert('L')
         np_img = self.__convert(img)
         prediction = self.__weights.dot(np_img.T)
-        prediction = self.__weights.dot(prediction)
-        # prediction = self.__weights.dot(prediction)
         for i in range(len(prediction)):
-            if prediction[i] > 0:
-                prediction[i] = 1
-            else:
-                prediction[i] = -1
+            prediction[i] = sign(prediction[i])
+        for j in range(100):
+            prediction = self.__weights.dot(prediction)
+            for i in range(len(prediction)):
+                prediction[i] = sign(prediction[i])
         prediction = prediction.reshape(self.resolution)
         plt.imshow(prediction)
         plt.colorbar()
@@ -81,9 +78,15 @@ class NeuralNetwork:
         print(sum(sum(self.__weights)))
 
 
+def sign(x):
+    if x >= 0:
+        return 1
+    else:
+        return -1
+
+
 network = NeuralNetwork(1, (28, 28))
 network.train()
 network.show_weights()
-c = network.predict('mnist_png/testing/3/32.png')
+c = network.predict('mnist_png/testing/0/28.png')
 network.sum()
-pass
