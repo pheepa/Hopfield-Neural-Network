@@ -1,9 +1,6 @@
 import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
-from skimage.transform import resize
-from skimage.color import rgb2gray
-from skimage.filters import threshold_mean
 from tqdm import tqdm
 
 
@@ -27,7 +24,9 @@ class NeuralNetwork:
         for i in range(10):
             digit_list = []
             for j in range(number_of_digits):
-                digit_list.append(Image.open('digits/' + str(i) + '/' + str(j) + '.png').convert('L'))
+                im = Image.open('digits/' + str(i) + '/' + str(j) + '.png').convert('L')
+                im_resized = im.resize(self.resolution, Image.ANTIALIAS)
+                digit_list.append(im_resized)
             self.__digits[i] = digit_list
 
     def train(self):
@@ -72,41 +71,52 @@ class NeuralNetwork:
         np_img = self.__convert(img)
         prediction = np_img
 
-        e = self.energy(np_img[0])
+        e = self.energy(prediction[0])
 
         for i in range(self.num_iter):
             prediction = np.sign(self.__weights @ prediction.T - self.threshold)
             e_new = self.energy(prediction.T[0])
 
             if e == e_new:
+                print(e)
                 return prediction
             prediction = prediction.T
             e = e_new
+        print(e)
         return prediction
 
-    def async_predict(self, path):
+    def async_predict(self, path, random=False):
         img = Image.open(path).convert('L')
-        np_img = self.__convert(img)
-        prediction = np_img.copy()
-        for i in range(self.resolution[0] * self.resolution[0]):
-            rand_column = randint(0, self.resolution[0] * self.resolution[0] - 1)
-            prediction[0][i] = prediction.dot(self.__weights[i].T)
-        # for i in range(len(prediction)):
-        #     if prediction[0][i] > 0:
-        #         prediction[0][i] = 1
-        #     else:
-        #         prediction[0][i] = -1
-        prediction = prediction.reshape(self.resolution)
-        plt.imshow(prediction)
-        plt.colorbar()
-        plt.show()
+        im_resized = img.resize(self.resolution, Image.ANTIALIAS)
+
+        np_img = self.__convert(im_resized)
+        prediction = np_img
+        e = self.energy(prediction[0])
+
+        for i in range(self.num_iter):
+            if random:
+                for j in range(100):
+                    idx = np.random.randint(0, self.resolution[0] * self.resolution[1])
+                    prediction[0][idx] = np.sign(self.__weights[idx].T @ prediction[0] - self.threshold)
+            else:
+                for idx in range(0, self.resolution[0] * self.resolution[1]):
+                    prediction[0][idx] = np.sign(self.__weights[idx].T @ prediction[0] - self.threshold)
+            # Compute new state energy
+            e_new = self.energy(prediction[0])
+
+            # s is converged
+            if e == e_new:
+                print(e)
+                return prediction
+            # Update energy
+            e = e_new
+        print(e)
         return prediction
 
     def __convert(self, img):
         np_img = np.array(img, dtype='int64')
         np_img = ~np_img  # invert B&W
-        np_img[np_img == 0] = -1
-        np_img[np_img < -1] = 1
+        np_img[np_img != -1] = 1
         np_img = np_img.reshape((1, self.resolution[0] * self.resolution[1]))
         return np_img
 
@@ -124,9 +134,8 @@ class NeuralNetwork:
         return -0.5 * s @ self.__weights @ s + np.sum(s * self.threshold)
 
 
-network = NeuralNetwork(1, (28, 28), 100)
+network = NeuralNetwork(1, (56, 56), 100)
 network.train()
 network.show_weights()
-c = network.predict('digits/1/0.png').reshape((28, 28))
+c = network.async_predict('digits/3/0.png', random=False).reshape((56, 56))
 show_smth(c)
-network.sum()
